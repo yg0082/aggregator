@@ -2,7 +2,7 @@ name: Refresh
 on:
   # performed every two hours
   schedule:
-    - cron: "0 */2 * * *"
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -65,7 +65,7 @@ jobs:
           fi
 
       - name: Refresh
-        run: python -u subscribe/collect.py --all --refresh --overwrite
+        run: python -u subscribe/collect.py --all --refresh --overwrite --delay 2000
 
       - name: Timestamp
         run: date
