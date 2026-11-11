@@ -216,7 +216,7 @@ def detect_region(name: str) -> str:
     def aggregate(args: argparse.Namespace) -> None:
     def parse_gist_link(link: str) -> tuple[str, str]:
         # 提取 gist 用户名及 id
-        words = utils.trim(link).split("/", maxsplit=1)
+words = utils.trim(link).split("/", maxsplit=1)
         if len(words) != 2:
             logger.error(f"cannot extract username and gist id due to invalid github gist link")
             return "", ""
