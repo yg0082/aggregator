@@ -152,7 +152,7 @@ def check(
             # prevents liveness check from being terminated due to a long period of time with no output
             logger.info(f"start liveness check, proxy: {proxy.get('name', '')}")
 
-        for target in targets:
+        for index, target in enumerate(targets):
             target = urllib.parse.quote(target)
             url = f"{base_url}{target}"
             content = utils.http_get(url=url, retry=2, interval=interval, trace=trace)
@@ -164,6 +164,8 @@ def check(
             if data.get("delay", -1) <= 0 or data.get("delay", -1) > delay:
                 alive = False
                 break
+            if index == 0:
+                proxy["delay"] = data.get("delay")
 
         return alive
     except Exception as e:
