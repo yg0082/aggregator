@@ -192,7 +192,28 @@ def assign(
     return tasks
 
 
-def aggregate(args: argparse.Namespace) -> None:
+def detect_region(name: str) -> str:
+    if "🇭🇰" in name or "香港" in name:
+        return "HK"
+    if "🇯🇵" in name or "日本" in name:
+        return "JP"
+    if "🇸🇬" in name or "新加坡" in name:
+        return "SG"
+    if "🇺🇸" in name or "美国" in name:
+        return "US"
+    tokens = set(name.lower().replace("-", " ").replace("_", " ").replace("|", " ").replace("/", " ").split())
+    if "hk" in tokens or "hongkong" in tokens or "hong kong" in name.lower():
+        return "HK"
+    if "jp" in tokens or "japan" in tokens:
+        return "JP"
+    if "sg" in tokens or "singapore" in tokens:
+        return "SG"
+    if "us" in tokens or "usa" in tokens or "united states" in name.lower():
+        return "US"
+    return ""
+
+
+    def aggregate(args: argparse.Namespace) -> None:
     def parse_gist_link(link: str) -> tuple[str, str]:
         # 提取 gist 用户名及 id
         words = utils.trim(link).split("/", maxsplit=1)
@@ -255,6 +276,30 @@ def aggregate(args: argparse.Namespace) -> None:
         binpath = os.path.join(workspace, clash_bin)
         confif_file = "config.yaml"
         proxies = clash.generate_config(workspace, list(proxies), confif_file)
+        # 按地区和来源筛选：只要香港、日本、新加坡、美国；
+        # 每个地区最多 5 个来源，每个来源最多 100 条
+        wanted = {"HK": 500, "JP": 500, "SG": 500, "US": 500}
+        per_source = 100
+        max_sources = 5
+        counts = {k: 0 for k in wanted}
+        source_counts = {}
+        sources_seen = {k: set() for k in wanted}
+        kept = []
+        for p in proxies:
+            region = detect_region(str(p.get("name", "")))
+            if region not in wanted or counts[region] >= wanted[region]:
+                continue
+            sub = str(p.get("sub", "") or "unknown")
+            key = (region, sub)
+            if source_counts.get(key, 0) >= per_source:
+                continue
+            if sub not in sources_seen[region] and len(sources_seen[region]) >= max_sources:
+                continue
+            sources_seen[region].add(sub)
+            source_counts[key] = source_counts.get(key, 0) + 1
+            counts[region] += 1
+            kept.append(p)
+        proxies = kept
 
         # 可执行权限
         utils.chmod(binpath)
@@ -290,6 +335,8 @@ def aggregate(args: argparse.Namespace) -> None:
             logger.error(f"terminate clash process error")
 
         nodes = [proxies[i] for i in range(len(proxies)) if masks[i]]
+        # 按实测延迟从低到高排序
+        nodes.sort(key=lambda p: p.get("delay", 10**9))
         if len(nodes) <= 0:
             logger.error(f"cannot fetch any proxy")
             sys.exit(0)
