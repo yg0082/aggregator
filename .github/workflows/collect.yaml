@@ -1,8 +1,8 @@
 name: Collect
 on:
-  # every 48 hours at 03:00 Asia/Shanghai
+  # every day at 03:00 Asia/Shanghai
   schedule:
-    - cron: "0 19 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *"
+    - cron: "0 19 * * * "
   workflow_dispatch:
 
 concurrency:
