@@ -15,7 +15,8 @@ Writes to the aggregator Gist:
 Caps: MAX_PER_REGION = 250, MAX_TOTAL = 1000 (user-set, 2026-11-14).
 Subscription B is built ONLY from the per-region lists, capped at
 MAX_SUB_PER_REGION = 50 per region (user-set, 2026-11-14: the nodes are
-untested, so 700+ in a subscription is useless). The full pool still goes
+untested, so 700+ in a subscription is useless). Nodes are tagged
+"<region>-<ip>" (e.g. hk-1.2.3.4). The full pool still goes
 to preferred_ips_all.txt for copying in the space.
 Sources that fail are skipped and logged; the run still succeeds.
 Only the standard library is used (no pip install needed).
@@ -111,10 +112,10 @@ def collect():
     return capped_region, total_sorted
 
 
-def build_singbox(uuid, ips):
-    tags = [f"auto-{ip}" for ip in ips]
+def build_singbox(uuid, entries):
+    tags = [f"{region}-{ip}" for region, ip in entries]
     outbounds = []
-    for ip, tag in zip(ips, tags):
+    for (region, ip), tag in zip(entries, tags):
         outbounds.append({
             "type": "vless",
             "tag": tag,
@@ -145,11 +146,11 @@ def build_singbox(uuid, ips):
     return json.dumps({"outbounds": outbounds}, ensure_ascii=False, indent=1)
 
 
-def build_clash(uuid, ips):
+def build_clash(uuid, entries):
     lines = ["proxies:"]
     tags = []
-    for ip in ips:
-        tag = f"auto-{ip}"
+    for region, ip in entries:
+        tag = f"{region}-{ip}"
         tags.append(tag)
         lines.append(f"  - name: {tag}")
         lines.append("    type: vless")
@@ -216,19 +217,23 @@ def main():
     for region in REGIONS:
         files[f"preferred_ips_{region}.txt"] = "\n".join(per_region[region]) + "\n"
     files["preferred_ips_all.txt"] = "\n".join(total) + "\n"
-    # Subscription B: only the per-region IPs, at most 50 per region
-    # (deduped across regions, since some IPs appear in several lists).
-    sub_ips = set()
+    # Subscription B: only the per-region IPs, at most 50 per region.
+    # Each node is tagged "<region>-<ip>" (e.g. hk-1.2.3.4); an IP that
+    # appears in several region lists is kept once, under the first region.
+    sub_entries = []
+    seen = set()
     for region in REGIONS:
-        sub_ips |= set(per_region[region][:MAX_SUB_PER_REGION])
-    sub_sorted = sorted(sub_ips)
-    print(f"subscription: {len(sub_sorted)} ips "
+        for ip in per_region[region][:MAX_SUB_PER_REGION]:
+            if ip not in seen:
+                seen.add(ip)
+                sub_entries.append((region, ip))
+    print(f"subscription: {len(sub_entries)} ips "
           f"(<= {MAX_SUB_PER_REGION} per region)", flush=True)
-    if not sub_sorted:
+    if not sub_entries:
         print("Error: empty subscription list, not writing to Gist", file=sys.stderr)
         return 1
-    files["singbox.json"] = build_singbox(uuid, sub_sorted)
-    files["clash.yaml"] = build_clash(uuid, sub_sorted)
+    files["singbox.json"] = build_singbox(uuid, sub_entries)
+    files["clash.yaml"] = build_clash(uuid, sub_entries)
     status = update_gist(gist_pat, gist_link, files)
     print(f"Gist updated, HTTP {status}", flush=True)
     return 0
