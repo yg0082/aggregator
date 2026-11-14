@@ -13,6 +13,10 @@ Writes to the aggregator Gist:
   clash.yaml / singbox.json   - subscription B (auto nodes)
 
 Caps: MAX_PER_REGION = 250, MAX_TOTAL = 1000 (user-set, 2026-11-14).
+Subscription B is built ONLY from the per-region lists, capped at
+MAX_SUB_PER_REGION = 50 per region (user-set, 2026-11-14: the nodes are
+untested, so 700+ in a subscription is useless). The full pool still goes
+to preferred_ips_all.txt for copying in the space.
 Sources that fail are skipped and logged; the run still succeeds.
 Only the standard library is used (no pip install needed).
 """
@@ -31,6 +35,7 @@ IP_RE = re.compile(
 
 MAX_PER_REGION = 250
 MAX_TOTAL = 1000
+MAX_SUB_PER_REGION = 50
 REGIONS = ["hk", "sg", "jp", "us", "tw", "kr"]
 
 # (region or None for global, url)
@@ -211,8 +216,19 @@ def main():
     for region in REGIONS:
         files[f"preferred_ips_{region}.txt"] = "\n".join(per_region[region]) + "\n"
     files["preferred_ips_all.txt"] = "\n".join(total) + "\n"
-    files["singbox.json"] = build_singbox(uuid, total)
-    files["clash.yaml"] = build_clash(uuid, total)
+    # Subscription B: only the per-region IPs, at most 50 per region
+    # (deduped across regions, since some IPs appear in several lists).
+    sub_ips = set()
+    for region in REGIONS:
+        sub_ips |= set(per_region[region][:MAX_SUB_PER_REGION])
+    sub_sorted = sorted(sub_ips)
+    print(f"subscription: {len(sub_sorted)} ips "
+          f"(<= {MAX_SUB_PER_REGION} per region)", flush=True)
+    if not sub_sorted:
+        print("Error: empty subscription list, not writing to Gist", file=sys.stderr)
+        return 1
+    files["singbox.json"] = build_singbox(uuid, sub_sorted)
+    files["clash.yaml"] = build_clash(uuid, sub_sorted)
     status = update_gist(gist_pat, gist_link, files)
     print(f"Gist updated, HTTP {status}", flush=True)
     return 0
