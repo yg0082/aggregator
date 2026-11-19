@@ -62,10 +62,10 @@ SOURCES = [
 ]
 
 # Template constants (non-sensitive). UUID comes from VLESS_UUID secret.
-# Backend switched 2026-11-15 22:43 to 260508 (separate account, own quota).
-TLS_SERVER_NAME = "260508.yg0082.workers.dev"
+# Backend switched back 2026-11-19 to 260509 (260508 dead 500 + abuse reports; Unikraft account terminated).
+TLS_SERVER_NAME = "260509.pages.dev"
 WS_PATH = "/?ed=2560"
-WS_HOST = "260508.yg0082.workers.dev"
+WS_HOST = "260509.pages.dev"
 SERVER_PORT = 443
 URLTEST_URL = "https://www.google.com/generate_204"
 URLTEST_INTERVAL = "5m"
